@@ -14,4 +14,10 @@
     <properties>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>dev.angelcruzl</groupId>
+            <artifactId>order-application-service</artifactId>
+        </dependency>
+    </dependencies>
 </project>
