@@ -16,9 +16,9 @@ public class Order extends AggregateRoot<OrderId> {
   private final StreetAddress deliveryAddress;
   private final Money price;
   private final List<OrderItem> items;
-  private final List<String> failureMessages;
   private TrackingId trackingId;
   private OrderStatus orderStatus;
+  private List<String> failureMessages;
 
   private Order(Builder builder) {
     super.setId(builder.orderId);
@@ -43,6 +43,45 @@ public class Order extends AggregateRoot<OrderId> {
     validateInitialOrder();
     validateTotalPrice();
     validateItemsPrice();
+  }
+
+  public void pay() {
+    if (orderStatus != OrderStatus.PENDING) {
+      throw new OrderDomainException("Order is not in correct state for payment operation!");
+    }
+    orderStatus = OrderStatus.PAID;
+  }
+
+  public void approve() {
+    if (orderStatus != OrderStatus.PAID) {
+      throw new OrderDomainException("Order is not in correct state for approve operation!");
+    }
+    orderStatus = OrderStatus.APPROVED;
+  }
+
+  public void initCancel(List<String> failureMessages) {
+    if (orderStatus != OrderStatus.PAID) {
+      throw new OrderDomainException("Order is not in correct state for initialCancel operation!");
+    }
+    orderStatus = OrderStatus.CANCELLING;
+    updateFailureMessages(failureMessages);
+  }
+
+  public void cancel(List<String> failureMessages) {
+    if (!(orderStatus == OrderStatus.CANCELLING || orderStatus == OrderStatus.PENDING)) {
+      throw new OrderDomainException("Order is not in correct state for cancel operation!");
+    }
+    orderStatus = OrderStatus.CANCELLED;
+    updateFailureMessages(failureMessages);
+  }
+
+  private void updateFailureMessages(List<String> failureMessages) {
+    if (this.failureMessages != null && failureMessages != null) {
+      this.failureMessages.addAll(failureMessages.stream().filter(message -> !message.isEmpty()).toList());
+    }
+    if (this.failureMessages == null) {
+      this.failureMessages = failureMessages;
+    }
   }
 
   private void validateInitialOrder() {
@@ -107,7 +146,7 @@ public class Order extends AggregateRoot<OrderId> {
     return trackingId;
   }
 
-  public OrderStatus getStatus() {
+  public OrderStatus getOrderStatus() {
     return orderStatus;
   }
 
