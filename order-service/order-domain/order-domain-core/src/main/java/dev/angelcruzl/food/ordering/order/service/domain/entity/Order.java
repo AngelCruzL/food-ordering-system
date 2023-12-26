@@ -2,10 +2,13 @@ package dev.angelcruzl.food.ordering.order.service.domain.entity;
 
 import dev.angelcruzl.food.ordering.domain.entity.AggregateRoot;
 import dev.angelcruzl.food.ordering.domain.valueobject.*;
+import dev.angelcruzl.food.ordering.order.service.domain.exception.OrderDomainException;
+import dev.angelcruzl.food.ordering.order.service.domain.valueobject.OrderItemId;
 import dev.angelcruzl.food.ordering.order.service.domain.valueobject.StreetAddress;
 import dev.angelcruzl.food.ordering.order.service.domain.valueobject.TrackingId;
 
 import java.util.List;
+import java.util.UUID;
 
 public class Order extends AggregateRoot<OrderId> {
   private final CustomerId customerId;
@@ -13,9 +16,9 @@ public class Order extends AggregateRoot<OrderId> {
   private final StreetAddress deliveryAddress;
   private final Money price;
   private final List<OrderItem> items;
-  private final TrackingId trackingId;
-  private final OrderStatus status;
   private final List<String> failureMessages;
+  private TrackingId trackingId;
+  private OrderStatus orderStatus;
 
   private Order(Builder builder) {
     super.setId(builder.orderId);
@@ -25,8 +28,59 @@ public class Order extends AggregateRoot<OrderId> {
     price = builder.price;
     items = builder.items;
     trackingId = builder.trackingId;
-    status = builder.status;
+    orderStatus = builder.orderStatus;
     failureMessages = builder.failureMessages;
+  }
+
+  public void initializeOrder() {
+    setId(new OrderId(UUID.randomUUID()));
+    trackingId = new TrackingId(UUID.randomUUID());
+    orderStatus = OrderStatus.PENDING;
+    initializeOrderItems();
+  }
+
+  public void validateOrder() {
+    validateInitialOrder();
+    validateTotalPrice();
+    validateItemsPrice();
+  }
+
+  private void validateInitialOrder() {
+    if (orderStatus != null || getId() != null) {
+      throw new OrderDomainException("Order is not in correct state for initialization");
+    }
+  }
+
+  private void validateTotalPrice() {
+    if (price == null || !price.isGreaterThanZero()) {
+      throw new OrderDomainException("Total price must be greater than zero");
+    }
+  }
+
+  private void validateItemsPrice() {
+    Money orderItemsTotal = items.stream().map(orderItem -> {
+      validateItemPrice(orderItem);
+      return orderItem.getSubTotal();
+    }).reduce(Money.ZERO, Money::add);
+
+    if (!price.equals(orderItemsTotal)) {
+      throw new OrderDomainException("Total price: " + price.getAmount()
+        + " is not equal to Order items total: " + orderItemsTotal.getAmount() + "!");
+    }
+  }
+
+  private void validateItemPrice(OrderItem orderItem) {
+    if (!orderItem.isPriceValid()) {
+      throw new OrderDomainException(("Order item price: " + orderItem.getPrice().getAmount()
+        + " is not valid for product: " + orderItem.getProduct().getId().getValue() + "!"));
+    }
+  }
+
+  private void initializeOrderItems() {
+    long itemId = 1;
+    for (OrderItem orderItem : items) {
+      orderItem.initializeOrderItem(super.getId(), new OrderItemId(itemId++));
+    }
   }
 
   public CustomerId getCustomerId() {
@@ -54,7 +108,7 @@ public class Order extends AggregateRoot<OrderId> {
   }
 
   public OrderStatus getStatus() {
-    return status;
+    return orderStatus;
   }
 
   public List<String> getFailureMessages() {
@@ -69,7 +123,7 @@ public class Order extends AggregateRoot<OrderId> {
     private Money price;
     private List<OrderItem> items;
     private TrackingId trackingId;
-    private OrderStatus status;
+    private OrderStatus orderStatus;
     private List<String> failureMessages;
 
     private Builder() {
@@ -114,8 +168,8 @@ public class Order extends AggregateRoot<OrderId> {
       return this;
     }
 
-    public Builder status(OrderStatus val) {
-      status = val;
+    public Builder orderStatus(OrderStatus val) {
+      orderStatus = val;
       return this;
     }
 
