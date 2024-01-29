@@ -7,6 +7,7 @@ import dev.angelcruzl.food.ordering.domain.valueobject.RestaurantId;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.CreateOrderCommand;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.CreateOrderResponse;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.OrderAddress;
+import dev.angelcruzl.food.ordering.order.service.domain.dto.track.TrackOrderResponse;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Order;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.OrderItem;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Product;
@@ -43,6 +44,14 @@ public class OrderDataMapper {
     return CreateOrderResponse.builder()
       .orderTrackingId(order.getTrackingId().getValue())
       .orderStatus(order.getOrderStatus())
+      .build();
+  }
+
+  public TrackOrderResponse orderToTrackOrderResponse(Order order) {
+    return TrackOrderResponse.builder()
+      .orderTrackingId(order.getTrackingId().getValue())
+      .orderStatus(order.getOrderStatus())
+      .failureMessages(order.getFailureMessages())
       .build();
   }
 
