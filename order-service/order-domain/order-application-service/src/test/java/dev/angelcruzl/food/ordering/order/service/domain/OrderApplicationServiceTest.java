@@ -2,18 +2,21 @@ package dev.angelcruzl.food.ordering.order.service.domain;
 
 import dev.angelcruzl.food.ordering.domain.valueobject.*;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.CreateOrderCommand;
+import dev.angelcruzl.food.ordering.order.service.domain.dto.create.CreateOrderResponse;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.OrderAddress;
 import dev.angelcruzl.food.ordering.order.service.domain.dto.create.OrderItem;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Customer;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Order;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Product;
 import dev.angelcruzl.food.ordering.order.service.domain.entity.Restaurant;
+import dev.angelcruzl.food.ordering.order.service.domain.exception.OrderDomainException;
 import dev.angelcruzl.food.ordering.order.service.domain.mapper.OrderDataMapper;
 import dev.angelcruzl.food.ordering.order.service.domain.ports.input.service.OrderApplicationService;
 import dev.angelcruzl.food.ordering.order.service.domain.ports.output.repository.CustomerRepository;
 import dev.angelcruzl.food.ordering.order.service.domain.ports.output.repository.OrderRepository;
 import dev.angelcruzl.food.ordering.order.service.domain.ports.output.repository.RestaurantRepository;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -146,5 +150,51 @@ public class OrderApplicationServiceTest {
         when(restaurantRepository.findRestaurantInformation(orderDataMapper.createOrderCommandToRestaurant(createOrderCommand)))
                 .thenReturn(Optional.of(restaurantResponse));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
+    }
+
+    @Test
+    public void testCreateOrder() {
+        CreateOrderResponse createOrderResponse = orderApplicationService.createOrder(createOrderCommand);
+
+        assertEquals(OrderStatus.PENDING, createOrderResponse.getOrderStatus());
+        assertEquals("Order Created Successfully", createOrderResponse.getMessage());
+        assertNotNull(createOrderResponse.getOrderTrackingId());
+    }
+
+    @Test
+    public void testCreateOrderWithWrongPrice() {
+        OrderDomainException orderDomainException = assertThrows(OrderDomainException.class,
+                () -> orderApplicationService.createOrder(createOrderCommandWrongPrice));
+
+        assertEquals("Total price: 279.00 is not equal to Order items total: 200.00!",
+                orderDomainException.getMessage());
+    }
+
+    @Test
+    public void testCreateOrderWithWrongProductPrice() {
+        OrderDomainException orderDomainException = assertThrows(OrderDomainException.class,
+                () -> orderApplicationService.createOrder(createOrderCommandWrongProductPrice));
+
+        assertEquals("Order item price: 60.00 is not valid for product: " + PRODUCT_ID + "!",
+                orderDomainException.getMessage());
+    }
+
+    @Test
+    public void testCreateOrderWithPassiveRestaurant() {
+        Restaurant restaurantResponse = Restaurant.Builder.builder()
+                .restaurantId(new RestaurantId(createOrderCommand.getRestaurantId()))
+                .products(List.of(
+                        new Product(new ProductId(PRODUCT_ID), "product_1", new Money(new BigDecimal("50.00"))),
+                        new Product(new ProductId(PRODUCT_ID), "product_2", new Money(new BigDecimal("50.00")))
+                ))
+                .active(false)
+                .build();
+
+        when(restaurantRepository.findRestaurantInformation(orderDataMapper.createOrderCommandToRestaurant(createOrderCommand)))
+                .thenReturn(Optional.of(restaurantResponse));
+        OrderDomainException orderDomainException = assertThrows(OrderDomainException.class,
+                () -> orderApplicationService.createOrder(createOrderCommand));
+        assertEquals("Restaurant with id " + RESTAURANT_ID + " is currently not active",
+                orderDomainException.getMessage());
     }
 }
